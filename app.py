@@ -26,6 +26,11 @@ df = pd.read_excel(uploaded_data)
 
 question_cols = [col for col in df.columns if col.startswith("Q")]
 
+# Jika tidak ada kolom pertanyaan, hentikan lebih awal
+if not question_cols:
+    st.error("Tidak ditemukan kolom pertanyaan (kolom yang diawali 'Q') di file input.")
+    st.stop()
+
 # ===============================
 #   MAPPING NILAI
 # ===============================
@@ -41,9 +46,12 @@ mapping = {
 df_numeric = (
     df[question_cols]
     .replace(mapping)
-    .infer_objects(copy=False)
     .apply(pd.to_numeric, errors="coerce")
 )
+
+# Jika semua nilai menjadi NaN setelah mapping, beri tahu user
+if df_numeric.isna().all(axis=None):
+    st.warning("Semua nilai pertanyaan tidak valid setelah pemetaan. Periksa format jawaban di file input.")
 
 # ===============================
 #   SIDEBAR
@@ -69,7 +77,7 @@ chart_choice = st.sidebar.selectbox(
 if chart_choice == "Distribusi Semua Jawaban (Bar Chart)":
     st.subheader("📊 Distribusi Semua Jawaban Kuesioner")
 
-    all_counts = df[question_cols].stack().value_counts().reset_index()
+    all_counts = df[question_cols].stack().dropna().value_counts().reset_index()
     all_counts.columns = ["Jawaban", "Jumlah"]
 
     fig = px.bar(
@@ -89,7 +97,7 @@ if chart_choice == "Distribusi Semua Jawaban (Bar Chart)":
 elif chart_choice == "Proporsi Jawaban (Pie Chart)":
     st.subheader("🥧 Proporsi Jawaban Keseluruhan")
 
-    all_counts = df[question_cols].stack().value_counts().reset_index()
+    all_counts = df[question_cols].stack().dropna().value_counts().reset_index()
     all_counts.columns = ["Jawaban", "Jumlah"]
 
     fig = px.pie(
@@ -110,7 +118,7 @@ elif chart_choice == "Distribusi Jawaban per Pertanyaan (Stacked Bar)":
 
     stack_data = pd.DataFrame()
     for q in question_cols:
-        temp = df[q].value_counts().rename(q)
+        temp = df[q].dropna().value_counts().rename(q)
         stack_data = pd.concat([stack_data, temp], axis=1)
     stack_data = stack_data.fillna(0)
 
@@ -157,7 +165,7 @@ elif chart_choice == "Kategori Positif / Netral / Negatif":
         "TS": "Negatif", "STS": "Negatif"
     }
 
-    flat = df[question_cols].stack().map(kategori_map)
+    flat = df[question_cols].stack().dropna().map(kategori_map)
     kategori_counts = flat.value_counts().reset_index()
     kategori_counts.columns = ["Kategori", "Jumlah"]
 
